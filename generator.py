@@ -41,15 +41,15 @@ class Generator:
             return yaml.safe_load(file)
 
     def generate_call_duration(self) -> float:
-        """Generate call duration based on shifted exponential distribution."""
+        """Generate call duration based on shifted exponential distribution. (Seconds)"""
         return self.call_duration_x0 + self.rng.exponential(1.0 / self.call_duration_lambda)
 
     def generate_inter_arrival_time(self) -> float:
-        """Generate inter-arrival time based on exponential distribution."""
+        """Generate inter-arrival time based on exponential distribution. (Seconds)"""
         return self.rng.exponential(1.0 / self.inter_arrival_time_lambda)
 
     def generate_velocity(self) -> float:
-        """Generate velocity based on normal distribution."""
+        """Generate velocity based on normal distribution. (Km/h)"""
         return self.rng.normal(self.velocity_mu, np.sqrt(self.velocity_variance))
 
     def generate_base_station(self) -> int:
@@ -57,7 +57,7 @@ class Generator:
         return self.rng.randint(self.base_station_min, self.base_station_max + 1)
     
     def generate_position(self) -> float:
-        """Generate position based on uniform continuous distribution."""
+        """Generate position based on uniform continuous distribution. (Km)"""
         return self.rng.uniform(self.position_min, self.position_max)
 
     def generate_direction(self) -> int:
@@ -74,6 +74,7 @@ if __name__ == "__main__":
     print(f"Velocity: {gen.generate_velocity():.2f} km/h")
     print(f"Base Station: {gen.generate_base_station()}")
     print(f"Position: {gen.generate_position():.2f} km")
+    print(f"Direction: {gen.generate_direction()}")
     
     # Generate multiple samples
     print("\nMultiple samples:")
@@ -84,3 +85,4 @@ if __name__ == "__main__":
         print(f"  Velocity: {gen.generate_velocity():.2f} km/h")
         print(f"  Base Station: {gen.generate_base_station()}")
         print(f"  Position: {gen.generate_position():.2f} km")
+        print(f"  Direction: {gen.generate_direction()}")
