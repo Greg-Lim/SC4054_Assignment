@@ -1,0 +1,24 @@
+# Parameters for SC4054 Assignment
+call_duration:
+  distribution: shifted_exponential
+  lambda: 0.010016437243961146
+  x0: 10.000
+
+inter_arrival_time:
+  distribution: exponential
+  lambda: 1.3698168816881688
+
+velocity:
+  distribution: normal
+  mu: 120.0720949
+  variance: 9.01905562259854
+
+base_station:
+  distribution: uniform discrete
+  min: 0
+  max: 19
+
+position:
+  distribution: uniform continuous
+  min: -20
+  max: 20
