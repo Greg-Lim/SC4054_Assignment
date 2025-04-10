@@ -89,7 +89,7 @@ class Simulator:
         self._id_counter = 0
 
         self.logging = logging
-        self.log = []
+        self.log:list[tuple[float, EventType, Car]] = []
 
         self._no_new_initialisation = _no_new_initialisation
 
@@ -125,8 +125,6 @@ class Simulator:
 
     def add_event(self, time, event_type, car_data):
         """Add an event to the event list, maintaining the order of events."""
-        if self.logging:
-            self.log.append((self.clock, event_type, car_data._copy()))
         heapq.heappush(self.event_list, (time, event_type, car_data))
 
     def run(self, max_steps=1000):
@@ -140,6 +138,10 @@ class Simulator:
             raise ValueError("No events in the event list.")
         
         time, event_type, car_data = heapq.heappop(self.event_list)
+
+        if self.logging:
+            self.log.append((time, event_type, car_data._copy()))
+
         self.clock = time
         if event_type == EventType.CALL_INITIATION:
             self.handle_call_initiation(car_data)
@@ -210,5 +212,27 @@ class Simulator:
             self.add_event(end_time, EventType.CALL_TERMINATION, car)
         else:
             # Schedule another handover event
-            handover_time = self.clock + (CELL_DAIMETER - car.position) / car.velocity
+            handover_time = self.clock + car.get_time_to_next_station()
             self.add_event(handover_time, EventType.CALL_HANDOVER, car)
+
+
+
+# Animation utils
+
+def time_to_position(log_time, time, car_position, car_velocity):
+    """
+    Calculate the position of a car at a given time based on its initial position and velocity.
+    
+    Args:
+        log_time: The time at which the car's position is logged.
+        time: The time at which to calculate the car's position.
+        car_position: The car's initial position in the cell (in meters).
+        car_velocity: The car's velocity (in meters per second).
+        
+    Returns:
+        The calculated position of the car in the cell at the given time.
+    """
+
+    time_diff = time - log_time
+    new_position = car_position + car_velocity * time_diff
+    return new_position
