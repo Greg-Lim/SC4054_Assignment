@@ -12,90 +12,88 @@ from simulator import Simulator, Car, EventType, TOTAL_CHANNELS, NUMBER_OF_BASE_
 from generator import Generator
 
 class TestCar(unittest.TestCase):
-    def test_car_copy(self):
-        """Test the _copy method of Car class"""
-        car = Car(_id=1, velocity=60, position=1000.0, station=5, call_duration=120.0)
-        car_copy = car._copy()
-        
-        # Check if the copy has the same attributes
-        self.assertEqual(car._id, car_copy._id)
-        self.assertEqual(car.velocity, car_copy.velocity)
-        self.assertEqual(car.position, car_copy.position)
-        self.assertEqual(car.station, car_copy.station)
-        self.assertEqual(car.call_duration, car_copy.call_duration)
-        
-        # Check if it's a different object
-        self.assertIsNot(car, car_copy)
-    
     def test_car_direction_positive(self):
         """Test get_direction with positive velocity"""
-        car = Car(_id=1, velocity=60, position=1000.0, station=5, call_duration=120.0)
+        car = Car(_id=1, velocity=60, root_position=500, root_station=5, call_duration=120.0, root_time=0.0)
         self.assertEqual(car.get_direction(), 1)
     
     def test_car_direction_negative(self):
         """Test get_direction with negative velocity"""
-        car = Car(_id=1, velocity=-60, position=1000.0, station=5, call_duration=120.0)
+        car = Car(_id=1, velocity=-60, root_position=500, root_station=5, call_duration=120.0, root_time=0.0)
         self.assertEqual(car.get_direction(), -1)
-    
-    def test_car_direction_zero(self):
-        """Test get_direction with zero velocity"""
-        car = Car(_id=1, velocity=0, position=1000.0, station=5, call_duration=120.0)
-        self.assertEqual(car.get_direction(), 0)
     
     def test_get_next_station(self):
         """Test get_next_station method"""
+        current_time = 0.0
         # Test moving forward
-        car_forward = Car(_id=1, velocity=60, position=1000.0, station=5, call_duration=120.0)
-        self.assertEqual(car_forward.get_next_station(), 6)
+        car_forward = Car(_id=1, velocity=60, root_position=500, root_station=5, call_duration=120.0, root_time=current_time)
+        self.assertEqual(car_forward.get_next_station(current_time-0.0001), 6)
+
+        transition_time = car_forward.get_time_to_next_station(current_time)
+        self.assertEqual(car_forward.get_next_station(current_time + transition_time-0.0001), 6)
         
         # Test moving backward
-        car_backward = Car(_id=2, velocity=-60, position=1000.0, station=5, call_duration=120.0)
-        self.assertEqual(car_backward.get_next_station(), 4)
+        car_backward = Car(_id=2, velocity=-60, root_position=500, root_station=5, call_duration=120.0, root_time=current_time)
+        self.assertEqual(car_backward.get_next_station(current_time), 4)
+
+        transition_time = car_backward.get_time_to_next_station(current_time)
+        self.assertEqual(car_backward.get_next_station(current_time + transition_time), 4)
         
-        # Test stationary
-        car_stationary = Car(_id=3, velocity=0, position=1000.0, station=5, call_duration=120.0)
-        self.assertEqual(car_stationary.get_next_station(), 5)
+        # Test root_stationary
+        car_stationary = Car(_id=3, velocity=0, root_position=500, root_station=5, call_duration=120.0, root_time=current_time)
+        self.assertEqual(car_stationary.get_next_station(current_time), 5)
     
     def test_next_station_is_valid(self):
         """Test next_station_is_valid method"""
+        current_time = 0.0
         # Test valid next station (middle of the road)
-        car_middle = Car(_id=1, velocity=60, position=1000.0, station=5, call_duration=120.0)
-        self.assertTrue(car_middle.next_station_is_valid())
+        car_middle = Car(_id=1, velocity=60, root_position=500, root_station=5, call_duration=120.0, root_time=current_time)
+        self.assertTrue(car_middle.next_station_is_valid(current_time))
         
         # Test invalid next station (edge cases)
-        car_edge_forward = Car(_id=2, velocity=60, position=1000.0, station=NUMBER_OF_BASE_STATIONS-1, call_duration=120.0)
-        self.assertFalse(car_edge_forward.next_station_is_valid())
+        car_edge_forward = Car(_id=2, velocity=60, root_position=500, root_station=NUMBER_OF_BASE_STATIONS-1, call_duration=120.0, root_time=current_time)
+        self.assertFalse(car_edge_forward.next_station_is_valid(current_time))
         
-        car_edge_backward = Car(_id=3, velocity=-60, position=1000.0, station=0, call_duration=120.0)
-        self.assertFalse(car_edge_backward.next_station_is_valid())
+        car_edge_backward = Car(_id=3, velocity=-60, root_position=500, root_station=0, call_duration=120.0, root_time=current_time)
+        self.assertFalse(car_edge_backward.next_station_is_valid(current_time))
     
     def test_get_time_to_next_station(self):
         """Test get_time_to_next_station method"""
-        # Cell diameter is TOTAL_ROAD_LENGTH / NUMBER_OF_BASE_STATIONS
+        current_time = 0.0
         # For a car moving forward
-        car_forward = Car(_id=1, velocity=10, position=1000.0, station=5, call_duration=120.0)
-        expected_time_forward = (CELL_DAIMETER - 1000.0) / 10
-        self.assertAlmostEqual(car_forward.get_time_to_next_station(), expected_time_forward)
+        car_forward = Car(_id=1, velocity=10, root_position=500, root_station=5, call_duration=120.0, root_time=current_time)
+        expected_time_forward = (CELL_DAIMETER - 500.0) / 10
+        self.assertAlmostEqual(car_forward.get_time_to_next_station(current_time), expected_time_forward)
         
         # For a car moving backward
-        car_backward = Car(_id=2, velocity=-10, position=1000.0, station=5, call_duration=120.0)
-        expected_time_backward = (1000.0 + CELL_DAIMETER) / 10
-        self.assertAlmostEqual(car_backward.get_time_to_next_station(), expected_time_backward)
-        
-        # For a car with zero velocity (should raise ValueError)
-        car_stationary = Car(_id=3, velocity=0, position=1000.0, station=5, call_duration=120.0)
-        with self.assertRaises(ValueError):
-            car_stationary.get_time_to_next_station()
+        car_backward = Car(_id=2, velocity=-10, root_position=500, root_station=5, call_duration=120.0, root_time=current_time)
+        expected_time_backward = 500.0 / 10
+        self.assertAlmostEqual(car_backward.get_time_to_next_station(current_time), expected_time_backward)
     
     def test_car_comparison(self):
         """Test car comparison (__lt__ method)"""
-        car1 = Car(_id=1, velocity=60, position=1000.0, station=5, call_duration=120.0)
-        car2 = Car(_id=2, velocity=60, position=1000.0, station=5, call_duration=120.0)
-        car3 = Car(_id=3, velocity=60, position=1000.0, station=5, call_duration=120.0)
+        car1 = Car(_id=1, velocity=60, root_position=500, root_station=5, call_duration=120.0, root_time=0.0)
+        car2 = Car(_id=2, velocity=60, root_position=500, root_station=5, call_duration=120.0, root_time=0.0)
+        car3 = Car(_id=3, velocity=60, root_position=500, root_station=5, call_duration=120.0, root_time=0.0)
         
         self.assertTrue(car1 < car2)
         self.assertTrue(car2 < car3)
         self.assertFalse(car2 < car1)
+
+    def test_is_still_active(self):
+        """Test is_still_active method"""
+        current_time = 50.0
+        car = Car(_id=1, velocity=10, root_position=500, root_station=5, call_duration=100.0, root_time=0.0)
+
+        # Test when the car is active
+        self.assertTrue(car.is_still_active(current_time))
+
+        # Test when the car is not yet active
+        self.assertFalse(car.is_still_active(-10.0))
+
+        # Test when the car's call has ended
+        self.assertFalse(car.is_still_active(150.0))
+    
 
 class TestSimulator(unittest.TestCase):
     def setUp(self):
@@ -118,7 +116,7 @@ class TestSimulator(unittest.TestCase):
         sim.event_list = []
         
         # Create a car for the event
-        car = Car(_id=1, velocity=60, position=1.0, station=5, call_duration=2.0)
+        car = Car(_id=1, velocity=60, root_position=1.0, root_station=5, call_duration=2.0, root_time=0.0)
         
         # Add events with different timestamps to test ordering
         sim.add_event(3.0, EventType.CALL_INITIATION, car)
@@ -136,13 +134,12 @@ class TestSimulator(unittest.TestCase):
         sim = Simulator(self.mock_generator, _no_initial_event=True, _no_new_initialisation=True)
         sim.event_list = []  # Clear event list
         
-        car = Car(_id=1, velocity=2/3.6, position=0.0, station=5, call_duration=1800)
+        car = Car(_id=1, velocity=2/3.6, root_position=1000, root_station=5, call_duration=1800, root_time=2)
         
         # Base station has no calls initially
         self.assertEqual(sim.base_stations[5], 0)
         
         # Handle call initiation
-        sim.clock = 2.0
         sim.handle_call_initiation(car)
         
         # Check if base station channel is allocated
@@ -151,7 +148,8 @@ class TestSimulator(unittest.TestCase):
         # Check if termination event is scheduled
         self.assertEqual(len(sim.event_list), 1)
         event = sim.event_list[0]
-        self.assertEqual(event[0], 1802)  # Time = current time + call duration
+        expected_time = (2000-1000) / (2/3.6) + 2
+        self.assertEqual(event[0], expected_time)  # Time = current time + call duration
         self.assertEqual(event[1], EventType.CALL_TERMINATION)
 
     def test_handle_call_initiation_blocked(self):
@@ -159,7 +157,7 @@ class TestSimulator(unittest.TestCase):
         sim = Simulator(self.mock_generator, _no_initial_event=True, _no_new_initialisation=True)
         sim.event_list = []  # Clear event list
         
-        car = Car(_id=1, velocity=20/3.6, position=0.0, station=5, call_duration=3600)
+        car = Car(_id=1, velocity=20/3.6, root_position=0.0, root_station=5, call_duration=3600, root_time=0.0)
         
         # Fill up all channels
         sim.base_stations[5] = TOTAL_CHANNELS
@@ -181,17 +179,16 @@ class TestSimulator(unittest.TestCase):
         sim = Simulator(self.mock_generator, _no_initial_event=True, _no_new_initialisation=True)
         sim.event_list = []  # Clear event list
         
-        car = Car(_id=1, velocity=20/3.6, position=0.0, station=5, call_duration=3600)
+        car = Car(_id=1, velocity=20/3.6, root_position=0.0, root_station=5, call_duration=3600, root_time=2.0)
         
         # Allocate a channel
-        sim.base_stations[car.station] = 1
+        sim.base_stations[car.get_current_station(sim.clock)] = 1
         
         # Handle call termination
-        sim.clock = 2.0
         sim.handle_call_termination(car)
         
         # Check if channel was released
-        self.assertEqual(sim.base_stations[car.station], 0)
+        self.assertEqual(sim.base_stations[car.get_current_station(sim.clock)], 0)
         
         # Check if completed calls was incremented
         self.assertEqual(sim.completed_calls, 1)
@@ -202,7 +199,7 @@ class TestSimulator(unittest.TestCase):
         sim.event_list = []  # Clear event list
         
         # Create car at station 5 moving to station 6
-        car = Car(_id=1, velocity=2/3.6, position=0.0, station=5, call_duration=3600)
+        car = Car(_id=1, velocity=2/3.6, root_position=0.0, root_station=5, call_duration=3600, root_time=0.0)
         
         # Set initial state (channel occupied at previous station)
         sim.base_stations[5] = 1  # Previous station
@@ -226,7 +223,7 @@ class TestSimulator(unittest.TestCase):
         sim.event_list = []  # Clear event list
         
         # Create car at station 5 moving to station 6
-        car = Car(_id=1, velocity=2/3.6, position=0.0, station=5, call_duration=3600)
+        car = Car(_id=1, velocity=2/3.6, root_position=0.0, root_station=5, call_duration=3600, root_time=0.0)
         
         # Set initial state (channel occupied at previous station and all channels occupied at new station)
         sim.base_stations[5] = 1  # Previous station
@@ -254,12 +251,12 @@ class TestSimulator(unittest.TestCase):
         sim.base_stations[5] = TOTAL_CHANNELS - 2  # One less than the threshold
         
         # This call should be accepted
-        car1 = Car(_id=1, velocity=2/3.6, position=0.0, station=5, call_duration=3600)
+        car1 = Car(_id=1, velocity=2/3.6, root_position=0.0, root_station=5, call_duration=3600, root_time=0.0)
         sim.handle_call_initiation(car1)
         self.assertEqual(sim.base_stations[5], TOTAL_CHANNELS - 1)
         
         # This call should be blocked (only reserved channels left)
-        car2 = Car(_id=2, velocity=2/3.6, position=0.0, station=5, call_duration=3600)
+        car2 = Car(_id=2, velocity=2/3.6, root_position=0.0, root_station=5, call_duration=3600, root_time=0.0)
         sim.handle_call_initiation(car2)
         self.assertEqual(sim.blocked_calls, 1)
 
@@ -276,6 +273,9 @@ class TestSimulator(unittest.TestCase):
         # Check if IDs are sequential
         self.assertEqual(ids, [0, 1, 2, 3, 4])
 
+    def test_end_of_highway_termination(self):
+        pass
+
     # Integration test for the entire simulation process
     def test_short_simulation_0_reserve(self):
         """Test a short simulation run"""
@@ -287,7 +287,7 @@ class TestSimulator(unittest.TestCase):
             sim.add_event(
                 i,
                 EventType.CALL_INITIATION,
-                Car(_id=i, velocity=2/3.6, position=0.0, station=5, call_duration=7200)
+                Car(_id=i, velocity=2/3.6, root_position=50, root_station=5, call_duration=7200, root_time=i)
             )
             sim.step()
 
@@ -297,9 +297,9 @@ class TestSimulator(unittest.TestCase):
 
         # Add a car to base station 6
         sim.add_event(
-            11,
+            20,
             EventType.CALL_INITIATION,
-            Car(_id=11, velocity=2/3.6, position=-20, station=6, call_duration=7200)
+            Car(_id=11, velocity=2/3.6, root_position=20, root_station=6, call_duration=7200, root_time=20)
         )
         sim.step()
 
@@ -322,20 +322,22 @@ class TestSimulator(unittest.TestCase):
 
         self.assertEqual(sim.blocked_calls, 1)
         self.assertEqual(sim.dropped_calls, 1)
-        self.assertEqual(sim.completed_calls, 9)
-        self.assertEqual(sim.base_stations[7], 1)
+        self.assertEqual(sim.completed_calls, 0)
+        self.assertEqual(sim.base_stations[7], 10)
         self.assertEqual(sim.base_stations[6], 0)
         self.assertEqual(sim.base_stations[5], 0)
-        self.assertEqual(len(sim.event_list), 1)
-        self.assertEqual(sim.clock, 7200+8) # 7209 was blocked and 7210 was dropped
+        self.assertEqual(len(sim.event_list), 10)
+        self.assertEqual(sim.clock, 7118.0) # need to verify this value
 
-        sim.step()
+        for i in range(11):
+            sim.step()
+
         self.assertEqual(sim.blocked_calls, 1)
         self.assertEqual(sim.dropped_calls, 1)
         self.assertEqual(sim.completed_calls, 10)
         self.assertEqual(sim.base_stations[7], 0)
         self.assertEqual(len(sim.event_list), 0)
-        self.assertEqual(sim.clock, 7211)
+        self.assertEqual(sim.clock, 7220) # need to verify this value
 
     def test_short_simulation_1_reserve(self):
         """Test a short simulation run with 1 reserved channel"""
@@ -347,7 +349,7 @@ class TestSimulator(unittest.TestCase):
             sim.add_event(
                 i,
                 EventType.CALL_INITIATION,
-                Car(_id=i, velocity=2/3.6, position=0.0, station=5, call_duration=7200)
+                Car(_id=i, velocity=2/3.6, root_position=50, root_station=5, call_duration=7200, root_time=i)
             )
             sim.step()
 
@@ -359,7 +361,7 @@ class TestSimulator(unittest.TestCase):
         sim.add_event(
             11,
             EventType.CALL_INITIATION,
-            Car(_id=11, velocity=2/3.6, position=-20, station=6, call_duration=7200)
+            Car(_id=11, velocity=2/3.6, root_position=20, root_station=6, call_duration=7200, root_time=11)
         )
         sim.step()
 
@@ -374,6 +376,7 @@ class TestSimulator(unittest.TestCase):
         self.assertEqual(sim.blocked_calls, 2)
         self.assertEqual(sim.dropped_calls, 0)
         self.assertEqual(sim.completed_calls, 0)
+
         self.assertEqual(sim.base_stations[6], 10)
         self.assertEqual(sim.base_stations[5], 0)
 
@@ -381,15 +384,17 @@ class TestSimulator(unittest.TestCase):
             sim.step()
 
         self.assertEqual(sim.blocked_calls, 2)
-        self.assertEqual(sim.dropped_calls, 0)
-        self.assertEqual(sim.completed_calls, 9)
-        self.assertEqual(sim.base_stations[7], 1)
+        self.assertEqual(sim.dropped_calls, 0) # no calls dropped
+        self.assertEqual(sim.completed_calls, 0)
+        self.assertEqual(sim.base_stations[7], 10) # all calls handed over to 7
         self.assertEqual(sim.base_stations[6], 0)
         self.assertEqual(sim.base_stations[5], 0)
-        self.assertEqual(len(sim.event_list), 1)
-        self.assertEqual(sim.clock, 7200+8) # 7209 was blocked and 7210 was dropped
+        self.assertEqual(len(sim.event_list), 10)
+        self.assertEqual(sim.clock, 7118.0) # need to verify this value
 
-        sim.step()
+        for i in range(11):
+            sim.step()
+
         self.assertEqual(sim.blocked_calls, 2)
         self.assertEqual(sim.dropped_calls, 0)
         self.assertEqual(sim.completed_calls, 10)

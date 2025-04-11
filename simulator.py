@@ -1,5 +1,3 @@
-
-
 from generator import Generator
 from dataclasses import dataclass
 import heapq
@@ -11,8 +9,13 @@ TOTAL_CHANNELS = 10
 NUMBER_OF_BASE_STATIONS = 20
 CELL_DAIMETER = TOTAL_ROAD_LENGTH / NUMBER_OF_BASE_STATIONS # meters
 
+EPSILON = 1e-6
+# Small value to avoid floating point errors
+# This value is used to ensure that the car is not at the end of the cell when checking for handover
+
 
 @dataclass
+@dataclass(frozen=True)
 class Car:
     """
     Class representing a car in the simulation.
@@ -24,46 +27,68 @@ class Car:
         station: Current base station the car is connected to.
         call_duration: Duration of the ongoing call (in seconds).
     """
-    _id: int  # Unique identifier for the car # useful for debugging and logging
+    _id: int  # Unique identifier for the car
     velocity: float  # Velocity of the car (meters per second)
-    position: float  # Current position of the car in the station (meters)
-    station: int  # Current base station the car is connected to
     call_duration: float  # Duration of the ongoing call (seconds)
+    root_position: float  # Initial position of the car in the cell (meters)
+    root_station: int  # Initial base station of the car
+    root_time: float  # Time at which the car was created (seconds)
 
-    def __lt__(self, other):
+    def __lt__(self, other: 'Car'):
         """Compare cars based on their ID for ordering."""
         return self._id < other._id
 
-    def _copy(self):
-        """Create a copy of the car object."""
-        return Car(
-            _id=self._id,
-            velocity=self.velocity,
-            position=self.position,
-            station=self.station,
-            call_duration=self.call_duration
-        )
-
-    def get_direction(self):
+    def get_direction(self) -> int:
         """Determine the direction of the car based on its velocity."""
         return int(self.velocity / abs(self.velocity)) if self.velocity != 0 else 0
     
-    def get_next_station(self):
-        """Get the next station based on the car's direction."""
-        return self.station + self.get_direction()
-    
-    def next_station_is_valid(self):
-        """Check if the next station is valid."""
-        return 0 <= self.get_next_station() < NUMBER_OF_BASE_STATIONS
-    
-    def get_time_to_next_station(self):
-        """Calculate the time to reach the next station."""
-        if self.get_direction() == -1:
-            return (self.position + CELL_DAIMETER) / abs(self.velocity)
-        elif self.get_direction() == 1:
-            return (CELL_DAIMETER - self.position) / abs(self.velocity)
+    def get_abs_position(self, current_time: float = None) -> float:
+        """
+        Get the absolute position of the car in the road based on its current position and velocity.
+        """
+        if current_time is None:
+            return self.root_station * CELL_DAIMETER  + self.root_position
         else:
-            raise ValueError("Car is dircetion Error")
+            return self.get_abs_position() + self.velocity * (current_time - self.root_time)
+
+    def get_current_station(self, current_time: float) -> int:
+        """Get the current station of the car based on its position."""
+        abs_position = self.get_abs_position(current_time)
+        # Handle edge case when car is exactly at the end of the road
+        if abs_position >= TOTAL_ROAD_LENGTH:
+            return NUMBER_OF_BASE_STATIONS - 1
+        if abs_position < 0:
+            return 0
+        return int(abs_position // CELL_DAIMETER)
+
+    def get_next_station(self, current_time: float) -> int:
+        """Get the next station based on the car's direction."""
+        return self.get_current_station(current_time) + self.get_direction()
+    
+    def next_station_is_valid(self, current_time: float) -> bool:
+        """Check if the next station is valid."""
+        next_station = self.get_next_station(current_time)
+        return 0 <= next_station < NUMBER_OF_BASE_STATIONS
+    
+    def get_time_to_next_station(self, current_time: float) -> float:
+        """Calculate the time to reach the next station."""
+        abs_position = self.get_abs_position(current_time)
+        current_station = self.get_current_station(current_time)
+        station_abs_end = current_station * CELL_DAIMETER + CELL_DAIMETER / 2 + self.get_direction() * CELL_DAIMETER / 2
+        if station_abs_end == abs_position:
+            return CELL_DAIMETER / abs(self.velocity)
+        return (station_abs_end - abs_position) / self.velocity
+
+    def get_end_time(self) -> float:
+        """Get the end time of the call."""
+        return self.root_time + self.call_duration
+    
+    def is_still_active(self, current_time: float) -> bool:
+        """Check if the car is still active or out of the simulation."""
+
+        is_active = self.root_time <= current_time <= self.get_end_time()
+        is_in_bounds = 0 <= self.get_current_station(current_time) < NUMBER_OF_BASE_STATIONS
+        return is_active and is_in_bounds
 
 class EventType(Enum):
     CALL_INITIATION = 'call_initiation'
@@ -79,7 +104,7 @@ class Simulator:
                  logging=False
                  ):
         self.clock = 0 # Simulation clock in seconds
-        self.event_list = []
+        self.event_list: list[tuple[float, EventType, Car]] = []
         self.base_stations = [0] * NUMBER_OF_BASE_STATIONS
         self.blocked_calls = 0
         self.dropped_calls = 0
@@ -110,9 +135,10 @@ class Simulator:
         return Car(
             _id=self._gen_car_id(),  # Generate unique car ID
             velocity=self.gen.generate_velocity()*self.gen.generate_direction() * 1000 / 3600,  # Convert km/h to m/s
-            position=self.gen.generate_position()*1000,  # Generate random position
-            station=self.gen.generate_base_station(),  # Generate random base station
-            call_duration=self.gen.generate_call_duration()  # Generate random call duration
+            call_duration=self.gen.generate_call_duration(),  # Generate random call duration
+            root_position=self.gen.generate_position()*1000,  # Generate random position
+            root_station=self.gen.generate_base_station(),  # Generate random base station
+            root_time=self.gen.generate_inter_arrival_time() + self.clock  # Generate random time of creation
         )
     
     def _base_station_have_free_channel_for_initialisation(self, station):
@@ -139,9 +165,7 @@ class Simulator:
         
         time, event_type, car_data = heapq.heappop(self.event_list)
 
-        if self.logging:
-            self.log.append((time, event_type, car_data._copy()))
-
+        assert time >= self.clock, f"Event time {time} is less than current clock {self.clock}."
         self.clock = time
         if event_type == EventType.CALL_INITIATION:
             self.handle_call_initiation(car_data)
@@ -152,51 +176,70 @@ class Simulator:
         else:
             raise ValueError(f"Unknown event type: {event_type}")
         
+        if self.logging:
+            self.log.append((time, event_type, car_data))
+        
     def handle_call_initiation(self, car: Car):
         # Initialise next call
         if not self._no_new_initialisation:
+            new_car = self._gen_car()
             self.add_event(
-                self.clock + self.gen.generate_inter_arrival_time(),
+                new_car.root_time,
                 EventType.CALL_INITIATION,
-                self._gen_car()
+                new_car
             )
 
+        # Check if the car leave the highway
+        if not car.next_station_is_valid(self.clock):
+            self.add_event(
+                self.clock + car.get_time_to_next_station(self.clock),
+                EventType.CALL_TERMINATION,
+                car
+            )
+            return 
+
         # Check if the call can be initiated
-        if not self._base_station_have_free_channel_for_initialisation(car.station):
+        if not self._base_station_have_free_channel_for_initialisation(car.get_current_station(self.clock)):
             self.blocked_calls += 1
             return
 
-        self.base_stations[car.station] += 1
+        self.base_stations[car.root_station] += 1
 
         self._scedule_termination_and_handover(car)
 
     def handle_call_handover(self, car: Car):
-        # Check if the call can be handed over
-        self.base_stations[car.station] -=1
+        # NOTE: As all handover events are at boundary conditions, we need to subtract EPSILON from the clock to get the correct station
+        
+        self.base_stations[car.get_current_station(self.clock-EPSILON)] -=1
 
-        if not car.next_station_is_valid():
-            self.dropped_calls += 1
-            return # Car is out of range
-        if not self._base_station_have_free_channel_for_handover(car.get_next_station()):
+        if self.clock > 123.3876225028:
+            1+1
+
+        # Check if the car leave the highway
+        if not car.next_station_is_valid(self.clock - EPSILON):
+            self.add_event(
+                self.clock + car.get_time_to_next_station(self.clock - EPSILON), # not sure if EPSILON is needed here
+                EventType.CALL_TERMINATION,
+                car
+            )
+            return # Car leave the highway
+
+        if not self._base_station_have_free_channel_for_handover(car.get_next_station(self.clock - EPSILON)):
             self.dropped_calls += 1
             return # No free channel in the next station
         
-        self.base_stations[car.get_next_station()] += 1
-
-        new_car_position = -2000 * car.get_direction()
-        new_call_duration = car.call_duration - car.get_time_to_next_station()
-        new_car_base_station = car.get_next_station()
-
-        # Update the car's attributes
-        car.position = new_car_position
-        car.call_duration = new_call_duration
-        car.station = new_car_base_station
+        self.base_stations[car.get_next_station(self.clock - EPSILON)] += 1
 
         self._scedule_termination_and_handover(car)
 
     def handle_call_termination(self, car: Car):
         # Release the channel for the base station
-        self.base_stations[car.station] -= 1
+
+        # if self.clock> 108.0896747967:
+        #     1+1
+
+        # NOTE: As some termination events are at boundary conditions, we need to subtract EPSILON from the clock to get the correct station
+        self.base_stations[car.get_current_station(self.clock-EPSILON)] -= 1
         self.completed_calls += 1
 
     def _scedule_termination_and_handover(self, car: Car):
@@ -205,34 +248,12 @@ class Simulator:
         This methods is garenteed to scedule either a termination or a handover event.
         """
 
-        end_time = self.clock + car.call_duration
-
         # Check if the call ends before reaching the end of the cell
-        if car.get_time_to_next_station() >= car.call_duration:
-            self.add_event(end_time, EventType.CALL_TERMINATION, car)
+        # EPSILON is used to find the next station
+        time_of_next_station = car.get_time_to_next_station(self.clock) + self.clock
+        if time_of_next_station > car.get_end_time():
+            self.add_event(car.get_end_time(), EventType.CALL_TERMINATION, car)
         else:
             # Schedule another handover event
-            handover_time = self.clock + car.get_time_to_next_station()
+            handover_time = time_of_next_station
             self.add_event(handover_time, EventType.CALL_HANDOVER, car)
-
-
-
-# Animation utils
-
-def time_to_position(log_time, time, car_position, car_velocity):
-    """
-    Calculate the position of a car at a given time based on its initial position and velocity.
-    
-    Args:
-        log_time: The time at which the car's position is logged.
-        time: The time at which to calculate the car's position.
-        car_position: The car's initial position in the cell (in meters).
-        car_velocity: The car's velocity (in meters per second).
-        
-    Returns:
-        The calculated position of the car in the cell at the given time.
-    """
-
-    time_diff = time - log_time
-    new_position = car_position + car_velocity * time_diff
-    return new_position
