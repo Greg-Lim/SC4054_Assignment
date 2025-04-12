@@ -7,7 +7,7 @@ import simulator
 import generator
 from tqdm import tqdm
 
-gen = generator.Generator(seed=37)
+gen = generator.Generator(seed=6)
 sim = simulator.Simulator(gen, channel_reserved_for_handover=1, logging=True)
 
 TOTAL_STEPS = 1000

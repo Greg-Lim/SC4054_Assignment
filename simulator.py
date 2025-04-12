@@ -9,7 +9,7 @@ TOTAL_CHANNELS = 10
 NUMBER_OF_BASE_STATIONS = 20
 CELL_DAIMETER = TOTAL_ROAD_LENGTH / NUMBER_OF_BASE_STATIONS # meters
 
-EPSILON = 1e-9
+EPSILON = 1e-6
 # Small value to avoid floating point errors
 # This value is used to ensure that the car is not at the end of the cell when checking for handover
 
