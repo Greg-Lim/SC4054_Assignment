@@ -87,13 +87,20 @@ class Car:
         """Check if the car is still active or out of the simulation."""
 
         is_active = self.root_time <= current_time <= self.get_end_time()
-        is_in_bounds = 0 <= self.get_current_station(current_time) < NUMBER_OF_BASE_STATIONS
+        is_in_bounds = 0 <= self.get_abs_position(current_time) < TOTAL_ROAD_LENGTH
         return is_active and is_in_bounds
 
 class EventType(Enum):
     CALL_INITIATION = 'call_initiation'
     CALL_TERMINATION = 'call_termination'
     CALL_HANDOVER = 'call_handover'
+
+class EventResult(Enum):
+    INITIATION_SUCCESS = 'initiation_success'
+    INITIATION_BLOCKED = 'initiation_blocked'
+    HANDOVER_SUCCESS = 'handover_success'
+    HANDOVER_DROPPED = 'handover_dropped'
+    TERMINATION = 'termination'
 
 class Simulator:
     def __init__(self, 
@@ -114,7 +121,7 @@ class Simulator:
         self._id_counter = 0
 
         self.logging = logging
-        self.log:list[tuple[float, EventType, Car]] = []
+        self.log:list[tuple[float, EventType, EventResult, Car]] = []
 
         self._no_new_initialisation = _no_new_initialisation
 
@@ -168,18 +175,18 @@ class Simulator:
         assert time >= self.clock, f"Event time {time} is less than current clock {self.clock}."
         self.clock = time
         if event_type == EventType.CALL_INITIATION:
-            self.handle_call_initiation(car_data)
+            event_result = self.handle_call_initiation(car_data)
         elif event_type == EventType.CALL_TERMINATION:
-            self.handle_call_termination(car_data)
+            event_result = self.handle_call_termination(car_data)
         elif event_type == EventType.CALL_HANDOVER:
-            self.handle_call_handover(car_data)
+            event_result = self.handle_call_handover(car_data)
         else:
             raise ValueError(f"Unknown event type: {event_type}")
         
         if self.logging:
-            self.log.append((time, event_type, car_data))
+            self.log.append((time, event_type, event_result, car_data, self.blocked_calls, self.dropped_calls, self.completed_calls))
         
-    def handle_call_initiation(self, car: Car):
+    def handle_call_initiation(self, car: Car) -> EventResult:
         # Initialise next call
         if not self._no_new_initialisation:
             new_car = self._gen_car()
@@ -196,18 +203,19 @@ class Simulator:
                 EventType.CALL_TERMINATION,
                 car
             )
-            return 
+            return EventResult.INITIATION_SUCCESS
 
         # Check if the call can be initiated
         if not self._base_station_have_free_channel_for_initialisation(car.get_current_station(self.clock)):
             self.blocked_calls += 1
-            return
+            return EventResult.INITIATION_BLOCKED
 
         self.base_stations[car.root_station] += 1
 
         self._scedule_termination_and_handover(car)
+        return EventResult.INITIATION_SUCCESS
 
-    def handle_call_handover(self, car: Car):
+    def handle_call_handover(self, car: Car) -> EventResult:
         # NOTE: As all handover events are at boundary conditions, we need to subtract EPSILON from the clock to get the correct station
         
         self.base_stations[car.get_current_station(self.clock-EPSILON)] -=1
@@ -222,17 +230,20 @@ class Simulator:
                 EventType.CALL_TERMINATION,
                 car
             )
-            return # Car leave the highway
+            return EventResult.HANDOVER_SUCCESS
 
         if not self._base_station_have_free_channel_for_handover(car.get_next_station(self.clock - EPSILON)):
+            # No free channel in the next station
             self.dropped_calls += 1
-            return # No free channel in the next station
+            return EventResult.HANDOVER_DROPPED
+            
         
         self.base_stations[car.get_next_station(self.clock - EPSILON)] += 1
 
         self._scedule_termination_and_handover(car)
+        return EventResult.HANDOVER_SUCCESS
 
-    def handle_call_termination(self, car: Car):
+    def handle_call_termination(self, car: Car) -> EventResult:
         # Release the channel for the base station
 
         # if self.clock> 108.0896747967:
@@ -241,6 +252,7 @@ class Simulator:
         # NOTE: As some termination events are at boundary conditions, we need to subtract EPSILON from the clock to get the correct station
         self.base_stations[car.get_current_station(self.clock-EPSILON)] -= 1
         self.completed_calls += 1
+        return EventResult.TERMINATION
 
     def _scedule_termination_and_handover(self, car: Car):
         """
