@@ -10,7 +10,14 @@ from tqdm import tqdm
 gen = generator.Generator(seed=37)
 sim = simulator.Simulator(gen, channel_reserved_for_handover=1, logging=True)
 
-sim.run(1000)
+SECTION_TO_ANIMATE = (500, 1000)
+TOTAL_STEPS = 1000
+
+print(f"Total steps: {TOTAL_STEPS}")
+print(f"Only showing from step {SECTION_TO_ANIMATE[0]} to {SECTION_TO_ANIMATE[1]}")
+
+
+sim.run(TOTAL_STEPS)
 
 full_data_df = pd.DataFrame(None, columns=["time", "all_car_pos"])
 
@@ -96,8 +103,8 @@ fig = go.Figure(
             {
                 "type": "buttons",
                 "direction": "right",
-                "x": 0.1,
-                "y": 0,
+                "x": 0.05,
+                "y": -0.1,  # Move buttons lower
                 "xanchor": "right",
                 "yanchor": "top",
                 "buttons": [
@@ -284,20 +291,19 @@ fig.add_trace(go.Scatter(
 sliders = [{
     "steps": slider_steps,
     "transition": {"duration": 150},  # Adjusted for faster playback
-    "x": 0.1,
+    "x": 0.07,
     "y": 0,
     "xanchor": "left",
     "yanchor": "top",
-    "len": 0.9,  # Set length to 90% of the available width
+    "len": 0.93,  # Set length to 90% of the available width
     "currentvalue": {"prefix": "Time: ", "visible": True, "xanchor": "right"},
     "pad": {"b": 10, "t": 50}  # Add padding to accommodate the buttons above
 }]
 
-fig.frames = frames
+fig.frames = frames[SECTION_TO_ANIMATE[0]:SECTION_TO_ANIMATE[1]]  # Only show the selected section
 fig.update_layout(sliders=sliders)
 
 fig.show()
-
 
 print("General Statistics:")
 print(f"Slots reserved for handover: {sim.channel_reserved_for_handover}")
