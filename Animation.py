@@ -10,12 +10,9 @@ from tqdm import tqdm
 gen = generator.Generator(seed=37)
 sim = simulator.Simulator(gen, channel_reserved_for_handover=1, logging=True)
 
-SECTION_TO_ANIMATE = (500, 1000)
 TOTAL_STEPS = 1000
 
 print(f"Total steps: {TOTAL_STEPS}")
-print(f"Only showing from step {SECTION_TO_ANIMATE[0]} to {SECTION_TO_ANIMATE[1]}")
-
 
 sim.run(TOTAL_STEPS)
 
@@ -175,7 +172,7 @@ for idx, row in tqdm(full_data_df.iterrows(), total=len(full_data_df), desc="Pro
 
     # Process active cars
     for car in current_cars:
-        # Check if car is still active at this time
+        # Render just dropped and blocked calls
         if (
             car._id == event_car_id and 
             (
@@ -206,7 +203,8 @@ for idx, row in tqdm(full_data_df.iterrows(), total=len(full_data_df), desc="Pro
                 hover_texts.append(f"Car {car._id}<br>Station: {car.get_current_station(time)}<br>Position: {x_pos:.2f} km")
                 colors.append("purple")
                 inactive_cars.add(car._id)
-        elif not car.is_still_active(time) and car._id not in inactive_cars:
+        # handle cars that are not active anymore 
+        elif not car.is_still_active(time) and car._id not in inactive_cars and car._id != event_car_id:
             # If we have a last known position for this car, use it
             if car._id in last_known_positions:
                 x_pos, y_pos, station, slot = last_known_positions[car._id]
@@ -219,8 +217,8 @@ for idx, row in tqdm(full_data_df.iterrows(), total=len(full_data_df), desc="Pro
                 # This should not happen if we track positions correctly
                 x_vals.append(0)
                 y_vals.append(0)
-                texts.append("")
-                hover_texts.append("")
+                texts.append(" ")
+                hover_texts.append(" ")
                 colors.append("rgba(0,0,0,0)")
         elif car._id not in inactive_cars:
             station = car.get_current_station(time-simulator.EPSILON)
@@ -236,7 +234,7 @@ for idx, row in tqdm(full_data_df.iterrows(), total=len(full_data_df), desc="Pro
             x_vals.append(x_pos)
             y_vals.append(y_pos)
             texts.append(f"Car {car._id}<br>ET:{car.get_end_time():.1f}")
-            hover_texts.append(f"Car {car._id}<br>Station: {station}<br>Position: {x_pos:.2f} km<br>Velocity {car.velocity}<br>End Time: {car.get_end_time():.1f}")
+            hover_texts.append(f"Car {car._id}<br>Station: {station}<br>Position: {x_pos:.2f} km<br>Velocity {car.velocity}<br>Start Time: {car.root_time}<br>End Time: {car.get_end_time():.1f}")
             
             station_slots[station] += 1
 
@@ -254,6 +252,15 @@ for idx, row in tqdm(full_data_df.iterrows(), total=len(full_data_df), desc="Pro
                     colors.append("purple")  # Purple for blocked calls
             else:
                 colors.append("grey")  # Gray for idle/neutral
+        else:
+            # If the car is inactive, we don't want to show it
+            x_vals.append(0)
+            y_vals.append(0)
+            texts.append(" ")
+            hover_texts.append(" ")
+            colors.append("rgba(0,0,0,0)")
+
+    # print("Length", len(x_vals), len(y_vals), len(texts), len(hover_texts), len(colors))
 
     frame = go.Frame(
         data=[
@@ -300,7 +307,7 @@ sliders = [{
     "pad": {"b": 10, "t": 50}  # Add padding to accommodate the buttons above
 }]
 
-fig.frames = frames[SECTION_TO_ANIMATE[0]:SECTION_TO_ANIMATE[1]]  # Only show the selected section
+fig.frames = frames
 fig.update_layout(sliders=sliders)
 
 fig.show()

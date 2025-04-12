@@ -75,7 +75,7 @@ class Car:
         abs_position = self.get_abs_position(current_time)
         current_station = self.get_current_station(current_time)
         station_abs_end = current_station * CELL_DAIMETER + CELL_DAIMETER / 2 + self.get_direction() * CELL_DAIMETER / 2
-        if station_abs_end == abs_position:
+        if abs(abs_position - station_abs_end) < EPSILON:
             return CELL_DAIMETER / abs(self.velocity)
         return (station_abs_end - abs_position) / self.velocity
 
@@ -173,6 +173,7 @@ class Simulator:
         time, event_type, car_data = heapq.heappop(self.event_list)
 
         assert time >= self.clock, f"Event time {time} is less than current clock {self.clock}."
+
         self.clock = time
         if event_type == EventType.CALL_INITIATION:
             event_result = self.handle_call_initiation(car_data)
@@ -182,6 +183,10 @@ class Simulator:
             event_result = self.handle_call_handover(car_data)
         else:
             raise ValueError(f"Unknown event type: {event_type}")
+        
+        for i in self.base_stations:
+            assert i <= TOTAL_CHANNELS, f"Base station channels exceeded: {i} > {TOTAL_CHANNELS}"
+            assert i >= 0, f"Base station channels negative: {i} < 0"
         
         if self.logging:
             self.log.append((time, event_type, event_result, car_data, self.blocked_calls, self.dropped_calls, self.completed_calls))
@@ -196,15 +201,6 @@ class Simulator:
                 new_car
             )
 
-        # Check if the car leave the highway
-        if not car.next_station_is_valid(self.clock):
-            self.add_event(
-                self.clock + car.get_time_to_next_station(self.clock),
-                EventType.CALL_TERMINATION,
-                car
-            )
-            return EventResult.INITIATION_SUCCESS
-
         # Check if the call can be initiated
         if not self._base_station_have_free_channel_for_initialisation(car.get_current_station(self.clock)):
             self.blocked_calls += 1
@@ -218,33 +214,23 @@ class Simulator:
     def handle_call_handover(self, car: Car) -> EventResult:
         # NOTE: As all handover events are at boundary conditions, we need to subtract EPSILON from the clock to get the correct station
         
-        self.base_stations[car.get_current_station(self.clock-EPSILON)] -=1
-
         # Check if the car leave the highway
         if not car.next_station_is_valid(self.clock - EPSILON):
-            self.add_event(
-                self.clock + car.get_time_to_next_station(self.clock - EPSILON), # not sure if EPSILON is needed here
-                EventType.CALL_TERMINATION,
-                car
-            )
-            return EventResult.HANDOVER_SUCCESS
+            return self.handle_call_termination(car)
+
+        self.base_stations[car.get_current_station(self.clock-EPSILON)] -=1
 
         if not self._base_station_have_free_channel_for_handover(car.get_next_station(self.clock - EPSILON)):
             # No free channel in the next station
             self.dropped_calls += 1
             return EventResult.HANDOVER_DROPPED
             
-        
         self.base_stations[car.get_next_station(self.clock - EPSILON)] += 1
-
         self._scedule_termination_and_handover(car)
         return EventResult.HANDOVER_SUCCESS
 
     def handle_call_termination(self, car: Car) -> EventResult:
         # Release the channel for the base station
-
-        # if self.clock> 108.0896747967:
-        #     1+1
 
         # NOTE: As some termination events are at boundary conditions, we need to subtract EPSILON from the clock to get the correct station
         self.base_stations[car.get_current_station(self.clock-EPSILON)] -= 1
