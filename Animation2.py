@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 from typing import Dict, List, Tuple, Set
+import plotly.express as px
 
 import simulator
 import generator
@@ -9,7 +10,7 @@ from tqdm import tqdm
 gen = generator.Generator(seed=37)
 sim = simulator.Simulator(gen, channel_reserved_for_handover=1, logging=True)
 
-sim.run(100)
+sim.run(1000)
 
 full_data_df = pd.DataFrame(None, columns=["time", "all_car_pos"])
 
@@ -21,6 +22,12 @@ inactive_cars:Set[simulator.Car] = set()  # Keep track of terminated cars separa
 
 time_list = []
 event_results_list = []
+blocked_count = 0
+dropped_count = 0
+completed_count = 0
+blocked_list = []
+dropped_list = []
+completed_list = []
 
 # Dictionary to store last known position of each car
 last_known_positions = {}  # {car_id: (x_pos, y_pos, station, slot)}
@@ -29,12 +36,26 @@ for log_entry in sim.log:
     time, event, event_results, car, no_blocked, no_dropped, no_completed = log_entry
 
     event_results_list.append((event_results, car._id))
+    
+    # Track counts of different events
+    if event_results == simulator.EventResult.INITIATION_BLOCKED:
+        blocked_count += 1
+    elif event_results == simulator.EventResult.HANDOVER_DROPPED:
+        dropped_count += 1
+    elif event_results == simulator.EventResult.TERMINATION:
+        completed_count += 1
+    
+    # Store the current counts
+    blocked_list.append(blocked_count)
+    dropped_list.append(dropped_count)
+    completed_list.append(completed_count)
 
     if event_results == simulator.EventResult.INITIATION_SUCCESS:
         # Add the car to the current cars list
         current_cars.append(car)
     elif event_results == simulator.EventResult.INITIATION_BLOCKED:
         # Handle blocked initiation if needed
+        current_cars.append(car)
         pass
     elif event_results == simulator.EventResult.HANDOVER_SUCCESS:
         # Handle successful handover if needed
@@ -52,7 +73,10 @@ for log_entry in sim.log:
 full_data_df = pd.DataFrame(
     {
         "time": time_list,
-        "event_results": event_results_list
+        "event_results": event_results_list,
+        "blocked": blocked_list,
+        "dropped": dropped_list,
+        "completed": completed_list
     }
 )
 
@@ -145,7 +169,37 @@ for idx, row in tqdm(full_data_df.iterrows(), total=len(full_data_df), desc="Pro
     # Process active cars
     for car in current_cars:
         # Check if car is still active at this time
-        if not car.is_still_active(time) and car._id not in inactive_cars:
+        if (
+            car._id == event_car_id and 
+            (
+                event_results == simulator.EventResult.INITIATION_BLOCKED or 
+                event_results == simulator.EventResult.HANDOVER_DROPPED
+            )
+        ):
+            if event_results == simulator.EventResult.INITIATION_BLOCKED:
+                # Handle blocked initiation
+                # The car will appear at the top of the capacity slot with red color
+                x_pos = car.get_abs_position(time) / 1000.0
+                y_pos = capacity_per_station
+                x_vals.append(x_pos)
+                y_vals.append(y_pos)
+                texts.append(f"Car {car._id}<br>Blocked")
+                hover_texts.append(f"Car {car._id}<br>Station: {car.get_current_station(time)}<br>Position: {x_pos:.2f} km")
+                colors.append("red")
+                inactive_cars.add(car._id)  # Add to inactive cars
+
+            elif event_results == simulator.EventResult.HANDOVER_DROPPED:
+                # Handle dropped handover
+                # The car will appear at the top of the capacity slot with purple color
+                x_pos = car.get_abs_position(time) / 1000.0
+                y_pos = capacity_per_station
+                x_vals.append(x_pos)
+                y_vals.append(y_pos)
+                texts.append(f"Car {car._id}<br>Dropped")
+                hover_texts.append(f"Car {car._id}<br>Station: {car.get_current_station(time)}<br>Position: {x_pos:.2f} km")
+                colors.append("purple")
+                inactive_cars.add(car._id)
+        elif not car.is_still_active(time) and car._id not in inactive_cars:
             # If we have a last known position for this car, use it
             if car._id in last_known_positions:
                 x_pos, y_pos, station, slot = last_known_positions[car._id]
@@ -161,36 +215,6 @@ for idx, row in tqdm(full_data_df.iterrows(), total=len(full_data_df), desc="Pro
                 texts.append("")
                 hover_texts.append("")
                 colors.append("rgba(0,0,0,0)")
-        elif (
-            car._id == event_car_id and 
-            (
-                event_results == simulator.EventResult.INITIATION_BLOCKED or 
-                event_results == simulator.EventResult.HANDOVER_DROPPED
-            )
-        ):
-            if event_results == simulator.EventResult.INITIATION_BLOCKED:
-                # Handle blocked initiation
-                # The car will appear at the top of the capacity slot with red color
-                x_pos = car.get_abs_position(time) / 1000.0
-                y_pos = capacity_per_station
-                x_vals.append(x_pos)
-                y_vals.append(y_pos)
-                texts.append("Car Blocked")
-                hover_texts.append(f"Car {car._id}<br>Station: {car.get_current_station(time)}<br>Position: {x_pos:.2f} km")
-                colors.append("red")
-                inactive_cars.add(car._id)  # Add to inactive cars
-
-            elif event_results == simulator.EventResult.HANDOVER_DROPPED:
-                # Handle dropped handover
-                # The car will appear at the top of the capacity slot with purple color
-                x_pos = car.get_abs_position(time) / 1000.0
-                y_pos = capacity_per_station
-                x_vals.append(x_pos)
-                y_vals.append(y_pos)
-                texts.append("Car Dropped")
-                hover_texts.append(f"Car {car._id}<br>Station: {car.get_current_station(time)}<br>Position: {x_pos:.2f} km")
-                colors.append("purple")
-                inactive_cars.add(car._id)
         elif car._id not in inactive_cars:
             station = car.get_current_station(time-simulator.EPSILON)
             abs_position = car.get_abs_position(time)
@@ -205,7 +229,7 @@ for idx, row in tqdm(full_data_df.iterrows(), total=len(full_data_df), desc="Pro
             x_vals.append(x_pos)
             y_vals.append(y_pos)
             texts.append(f"Car {car._id}<br>ET:{car.get_end_time():.1f}")
-            hover_texts.append(f"Car {car._id}<br>Station: {station}<br>Position: {x_pos:.2f} km<br>End Time: {car.get_end_time():.1f}")
+            hover_texts.append(f"Car {car._id}<br>Station: {station}<br>Position: {x_pos:.2f} km<br>Velocity {car.velocity}<br>End Time: {car.get_end_time():.1f}")
             
             station_slots[station] += 1
 
@@ -273,3 +297,23 @@ fig.frames = frames
 fig.update_layout(sliders=sliders)
 
 fig.show()
+
+
+print("General Statistics:")
+print(f"Slots reserved for handover: {sim.channel_reserved_for_handover}")
+print(f"Total Cars Blocked: {blocked_count}")
+print(f"Total Cars Dropped: {dropped_count}")
+print(f"Total Cars Completed: {completed_count}")
+print(f"Total Cars Initiated: {len(current_cars)}")
+
+print("\nDropped Calls Timings:")
+for log_entry in sim.log:
+    time, event, event_results, car, _, _, _ = log_entry
+    if event_results == simulator.EventResult.HANDOVER_DROPPED:
+        print(f"Time: {time}, Car ID: {car._id}")
+
+print("\nBlocked Calls Timings:")
+for log_entry in sim.log:
+    time, event, event_results, car, _, _, _ = log_entry
+    if event_results == simulator.EventResult.INITIATION_BLOCKED:
+        print(f"Time: {time}, Car ID: {car._id}")

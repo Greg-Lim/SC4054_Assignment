@@ -220,9 +220,6 @@ class Simulator:
         
         self.base_stations[car.get_current_station(self.clock-EPSILON)] -=1
 
-        if self.clock > 123.3876225028:
-            1+1
-
         # Check if the car leave the highway
         if not car.next_station_is_valid(self.clock - EPSILON):
             self.add_event(
