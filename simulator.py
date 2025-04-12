@@ -9,7 +9,7 @@ TOTAL_CHANNELS = 10
 NUMBER_OF_BASE_STATIONS = 20
 CELL_DAIMETER = TOTAL_ROAD_LENGTH / NUMBER_OF_BASE_STATIONS # meters
 
-EPSILON = 1e-6
+EPSILON = 1e-9
 # Small value to avoid floating point errors
 # This value is used to ensure that the car is not at the end of the cell when checking for handover
 
@@ -56,10 +56,10 @@ class Car:
         abs_position = self.get_abs_position(current_time)
         # Handle edge case when car is exactly at the end of the road
         if abs_position >= TOTAL_ROAD_LENGTH:
-            return NUMBER_OF_BASE_STATIONS - 1
+            raise ValueError("Car is out of bounds.")
         if abs_position < 0:
-            return 0
-        return int(abs_position // CELL_DAIMETER)
+            raise ValueError("Car is out of bounds.")
+        return int((abs_position) // CELL_DAIMETER)
 
     def get_next_station(self, current_time: float) -> int:
         """Get the next station based on the car's direction."""
@@ -126,11 +126,12 @@ class Simulator:
         self._no_new_initialisation = _no_new_initialisation
 
         # Add initial event to the event list
+        new_car = self._gen_car()
         if not _no_initial_event:
             self.add_event(
-                self.clock + self.gen.generate_inter_arrival_time(),
+                new_car.root_time,
                 EventType.CALL_INITIATION,
-                self._gen_car()
+                new_car
             )
 
     def _gen_car_id(self):
@@ -206,9 +207,17 @@ class Simulator:
             self.blocked_calls += 1
             return EventResult.INITIATION_BLOCKED
 
+        # Add car to the base station
         self.base_stations[car.root_station] += 1
 
-        self._scedule_termination_and_handover(car)
+        # Schedule the next handover event
+        time_of_next_station = car.get_time_to_next_station(self.clock) + self.clock
+        if time_of_next_station > car.get_end_time():
+            self.add_event(car.get_end_time(), EventType.CALL_TERMINATION, car)
+        else:
+            # Schedule handover event
+            handover_time = time_of_next_station
+            self.add_event(handover_time, EventType.CALL_HANDOVER, car)
         return EventResult.INITIATION_SUCCESS
 
     def handle_call_handover(self, car: Car) -> EventResult:
@@ -216,9 +225,14 @@ class Simulator:
         
         # Check if the car leave the highway
         if not car.next_station_is_valid(self.clock - EPSILON):
-            return self.handle_call_termination(car)
+            self.base_stations[car.get_current_station(self.clock-EPSILON)] -= 1
+            self.completed_calls += 1
+            return EventResult.TERMINATION
 
-        self.base_stations[car.get_current_station(self.clock-EPSILON)] -=1
+        # Store the current station for potential restoration
+        current_station = car.get_current_station(self.clock-EPSILON)
+        # Release the channel from the current station
+        self.base_stations[current_station] -= 1
 
         if not self._base_station_have_free_channel_for_handover(car.get_next_station(self.clock - EPSILON)):
             # No free channel in the next station
@@ -226,25 +240,6 @@ class Simulator:
             return EventResult.HANDOVER_DROPPED
             
         self.base_stations[car.get_next_station(self.clock - EPSILON)] += 1
-        self._scedule_termination_and_handover(car)
-        return EventResult.HANDOVER_SUCCESS
-
-    def handle_call_termination(self, car: Car) -> EventResult:
-        # Release the channel for the base station
-
-        # NOTE: As some termination events are at boundary conditions, we need to subtract EPSILON from the clock to get the correct station
-        self.base_stations[car.get_current_station(self.clock-EPSILON)] -= 1
-        self.completed_calls += 1
-        return EventResult.TERMINATION
-
-    def _scedule_termination_and_handover(self, car: Car):
-        """
-        Schedule the termination and handover events for a car.
-        This methods is garenteed to scedule either a termination or a handover event.
-        """
-
-        # Check if the call ends before reaching the end of the cell
-        # EPSILON is used to find the next station
         time_of_next_station = car.get_time_to_next_station(self.clock) + self.clock
         if time_of_next_station > car.get_end_time():
             self.add_event(car.get_end_time(), EventType.CALL_TERMINATION, car)
@@ -252,3 +247,12 @@ class Simulator:
             # Schedule another handover event
             handover_time = time_of_next_station
             self.add_event(handover_time, EventType.CALL_HANDOVER, car)
+        return EventResult.HANDOVER_SUCCESS
+
+    def handle_call_termination(self, car: Car) -> EventResult:
+        # Release the channel for the base station
+
+        # NOTE: As some termination events are at boundary conditions, we need to subtract EPSILON from the clock to get the correct station
+        self.base_stations[car.get_current_station(self.clock)] -= 1
+        self.completed_calls += 1
+        return EventResult.TERMINATION
