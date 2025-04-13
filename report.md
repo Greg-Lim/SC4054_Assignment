@@ -5,6 +5,29 @@
 
 **GitHub Repository:** [https://github.com/Greg-Lim/SC4054_Assignment](https://github.com/Greg-Lim/SC4054_Assignment)
 
+## Table of Contents
+- [1. Selection of distribution and parameters](#1-selection-of-distribution-and-parameters)
+   - [1.1 Data Independence Analysis](#11-data-independence-analysis)
+   - [1.2 Call Duration Analysis](#12-call-duration-analysis)
+   - [1.3 Inter-arrival Time Analysis](#13-inter-arrival-time-analysis)
+   - [1.4 Velocity Analysis](#14-velocity-analysis)
+   - [1.5 Base Station Distribution Analysis](#15-base-station-distribution-analysis)
+   - [1.6 Summary of Selected Distributions and Parameters](#16-summary-of-selected-distributions-and-parameters)
+- [2. Simulation Architecture](#2-simulation-architecture)
+   - [2.1 Core Components & Operation](#21-core-components--operation)
+   - [2.2 Technical Implementation Details](#22-technical-implementation-details)
+- [3. Verification & Validation](#3-verification--validation)
+   - [3.1 Testing](#31-testing)
+   - [3.2 Animation](#32-animation)
+- [4. Output Analysis](#4-output-analysis)
+   - [4.1 Steady State Analysis](#41-steady-state-analysis)
+   - [4.2 Sample Size Determination](#42-sample-size-determination)
+   - [4.3 Final Results and Analysis](#43-final-results-and-analysis)
+   - [4.4 Conclusion and Recommendations](#44-conclusion-and-recommendations)
+- [5. Appendix: Event Handling Pseudocode](#5-appendix-event-handling-pseudocode)
+
+<div style="page-break-after: always;"></div>
+
 # 1. Selection of distribution and parameters
 
 ## 1.1 Data Independence Analysis
@@ -219,8 +242,13 @@ Based on our analysis, we have determined the following distributions and parame
    - $\hat{\sigma} = 9.01905562259854$ (standard deviation)
 
 4. **Base Station:** Uniform Discrete Distribution
-   - Range: [1, 20]
-   - $f(x) = \frac{1}{20}$ for $x \in \{1, 2, \ldots, 20\}$
+   - Range: [0, 19]
+   - $f(x) = \frac{1}{20}$ for $x \in \{0, 1, \ldots, 19\}$
+
+5. **Position in Base Station:** Uniform Distribution
+   - Range: \[0, 2\)
+   - $f(x) = \frac{1}{2}$ for $x \in [0, 2)$
+   - Note: Distribution and parameters are given in project Assumption c.
 
 All distributions were validated using Chi-square goodness-of-fit tests at a 5% significance level, and all null hypotheses were not rejected, confirming our distribution selections.
 
@@ -267,6 +295,8 @@ The simulation incorporates several technical solutions to handle edge cases tha
 - **Event Timing Precision**: All events maintain strict chronological ordering in the priority queue, with assertion checks to prevent any temporal causality violations where an event might incorrectly be processed before events that should precede it.
 
 These technical solutions ensure robust simulation behavior even in edge cases such as simultaneous events, boundary transitions, or near-coincident handovers that might otherwise lead to ambiguous system states.
+
+<div style="page-break-after: always;"></div>
 
 # 3. Verification & Validation
 
@@ -368,6 +398,8 @@ The animation clearly highlights reserved channels with a blue line, making it e
 
 This visual approach provides intuitive verification beyond numerical results, effectively demonstrating the simulation's dynamic behavior and protocol adherence.
 
+<div style="page-break-after: always;"></div>
+
 # 4. Output Analysis
 
 After verifying the simulation's correctness, we conducted a thorough output analysis to determine the optimal number of channels to reserve for handovers and to analyze the system's performance characteristics.
@@ -402,6 +434,9 @@ After determining the warm-up period, we conducted additional simulations, exclu
 
 The post-warmup analysis confirms that the system stabilizes after the warm-up period, with consistent blocked and dropped call percentages for both channel reservation policies.
 
+### 4.1.3 Termination Step Calculation
+To ensure sufficient data collection in the steady state, we set the termination step to 350,000, which is 10 times the warm-up period of 35,000 steps. This results in 385,000 total steps for each simulation run.
+
 ## 4.2 Sample Size Determination
 
 To ensure the statistical significance of our results, we used a pilot study to determine the required number of simulation runs. Using a target half-width of the confidence interval of 0.002 with a 95% confidence level, we calculated the required sample size using:
@@ -413,7 +448,7 @@ Where:
 - $\delta$ is the half-width of the confidence interval from the pilot study
 - $\beta$ is the target precision
 
-Based on this analysis, we determined that approximately 225 simulation runs were needed to achieve the desired precision.
+Based on this analysis, we determined that approximately 44 simulation runs were needed to achieve the desired precision.
 
 ## 4.3 Final Results and Analysis
 
@@ -429,7 +464,21 @@ After completing the required number of simulation runs with the identified warm
 - Dropped calls: 0.0034 ± 0.0001 (95% CI)
 - Blocked calls: 0.0109 ± 0.0002 (95% CI)
 
-### 4.3.2 Trade-off Analysis
+### 4.3.2 Half-width of Confidence Interval
+
+The half-width \( \delta \) of the confidence interval is given by:
+
+$$
+\delta = t_{n-1,\,1 - \alpha/2} \cdot \frac{S(n)}{\sqrt{n}}
+$$
+
+Where:
+
+- \( t_{n-1,\,1 - \alpha/2} \): critical value from the *t-distribution* with \( n-1 \) degrees of freedom
+- \( S(n) \): sample standard deviation from \( n \) replications
+- \( n \): number of replications
+
+### 4.3.3 Trade-off Analysis
 
 The results demonstrate a clear trade-off between blocked calls and dropped calls across the two channel reservation strategies:
 
@@ -443,11 +492,11 @@ The results demonstrate a clear trade-off between blocked calls and dropped call
 
 This trade-off occurs because reserving a channel for handovers reduces the number of channels available for new calls, leading to more blocked calls. However, it ensures that more handovers can be completed successfully, reducing the number of dropped calls.
 
-### 4.3.3 Statistical Significance
+### 4.3.4 Statistical Significance
 
 The confidence intervals for all metrics are relatively narrow (±0.01-0.02 percentage points), indicating high statistical precision in our results. The non-overlapping confidence intervals between the two strategies confirm that the differences in performance metrics are statistically significant.
 
-### 4.3.4 QoS Requirements Assessment
+### 4.3.5 QoS Requirements Assessment
 
 The project requirements specified the following QoS criteria:
 - Blocked calls < 2%
@@ -482,6 +531,8 @@ Justification:
 2. While this increases blocked calls (0.34% → 1.09%), blocked calls are generally less problematic for user experience than dropped calls, as users can simply retry a blocked call.
 3. Dropped calls represent an interruption of an ongoing service, which typically creates more customer dissatisfaction than a blocked new call attempt.
 4. The blocked call percentage (1.09%) with 1 reserved channel still remains well below the 2% requirement, providing a comfortable margin for potential traffic increases.
+
+<div style="page-break-after: always;"></div>
 
 # 5. Appendix: Event Handling Pseudocode
 
