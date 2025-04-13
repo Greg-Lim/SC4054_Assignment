@@ -1,18 +1,30 @@
-# SC4054_Assignment
+# SC4054 Assignment: Simulation of a Cellular Telephony Network
 
-# Components
-<!-- Covers the differenct notebooks and code files -->
+A discrete-event simulation of a cellular telephony network along a highway with multiple base stations.
 
-# Architecture
-<!-- Describe the architecture of the project, including the main components and their interactions. -->
+![Animation Demo](./animation_demo.gif)
 
-# Testing
+## Getting Started
 
+### Running the Simulation with Animation
 
-# TODO:
-Sensitivity analysis
+```bash
+python Animation.py
+```
 
-Steady state - done
+### Running Tests
 
+```bash
+pytest
+```
 
-accuraccy and relertive precision
+## Components
+
+The project contains the following key components:
+
+1. **Simulator (simulator.py)**: Core discrete-event simulation engine that models the cellular network
+2. **Generator (generator.py)**: Generates random variables following specified distributions
+3. **Animation (Animation.py)**: Provides visualization of the simulation
+4. **Jupyter Notebooks**:
+   - **input_modeling.ipynb**: Analysis and modeling of input distributions
+   - **output_analysis.ipynb**: Statistical analysis of simulation results

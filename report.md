@@ -3,6 +3,8 @@
 **Name:** **Lim Song Wei, Greg**  
 **Matriculation Number:** **U2120517G**
 
+**GitHub Repository:** [https://github.com/Greg-Lim/SC4054_Assignment](https://github.com/Greg-Lim/SC4054_Assignment)
+
 # 1. Selection of distribution and parameters
 
 ## 1.1 Data Independence Analysis
@@ -308,6 +310,8 @@ Long-running tests in `test_simulator_long.py` verify system stability:
 
 The animation component (`Animation.py`) provides visual verification of the simulation's correctness through dynamic visualization.
 
+A demo of the animation can be found at the GitHub repo here, [Animation Demo](https://github.com/Greg-Lim/SC4054_Assignment/blob/c797c6d8cb1c2427eb0cbb70c43da4fcca909a37/animation_demo.gif)
+
 ### 3.2.1 Visual Verification
 
 The animation enables visual confirmation of several key behaviors:
@@ -479,6 +483,117 @@ Justification:
 3. Dropped calls represent an interruption of an ongoing service, which typically creates more customer dissatisfaction than a blocked new call attempt.
 4. The blocked call percentage (1.09%) with 1 reserved channel still remains well below the 2% requirement, providing a comfortable margin for potential traffic increases.
 
+# 5. Appendix: Event Handling Pseudocode
 
+To provide deeper insight into the simulation's operation, below is the pseudocode for the initialization and the three main event handlers in our discrete-event simulation:
 
+## 5.1 Simulation Initialization
 
+```
+FUNCTION Initialize_Simulation(generator, channel_reserved_for_handover):
+    SET clock = 0
+    SET event_list = empty priority queue
+    SET base_stations = array of zeros with length NUMBER_OF_BASE_STATIONS
+    SET blocked_calls = 0
+    SET dropped_calls = 0
+    SET completed_calls = 0
+    SET channel_reserved_for_handover = channel_reserved_for_handover
+    
+    # Generate first car and schedule its call initiation
+    new_car = Generate_New_Car()
+    Add_Event(new_car.arrival_time, CALL_INITIATION, new_car)
+```
+
+## 5.2 Call Initiation Event Handler
+
+```
+FUNCTION Handle_Call_Initiation(car):
+    # First, schedule the next call initiation
+    new_car = Generate_New_Car()
+    Add_Event(new_car.arrival_time, CALL_INITIATION, new_car)
+    
+    # Check if current base station has available non-reserved channels
+    current_station = car.get_current_station(clock)
+    IF base_stations[current_station] < TOTAL_CHANNELS - channel_reserved_for_handover THEN
+        # Channel available - allocate it
+        base_stations[current_station] += 1
+        
+        # Calculate when this car will either reach the next station or end its call
+        time_to_next_station = car.get_time_to_next_station(clock)
+        time_of_next_station = clock + time_to_next_station
+        
+        IF time_of_next_station > car.get_end_time() THEN
+            # Call will end before reaching next station
+            Add_Event(car.get_end_time(), CALL_TERMINATION, car)
+        ELSE
+            # Car will reach next station during the call
+            Add_Event(time_of_next_station, CALL_HANDOVER, car)
+        ENDIF
+        
+        RETURN INITIATION_SUCCESS
+    ELSE
+        # No channel available - call is blocked
+        blocked_calls += 1
+        RETURN INITIATION_BLOCKED
+    ENDIF
+```
+
+## 5.3 Call Handover Event Handler
+
+```
+FUNCTION Handle_Call_Handover(car):
+    # Check if car is at a valid position for handover
+    current_station = car.get_current_station(clock - EPSILON)
+    
+    # Check if car is leaving the highway
+    IF NOT car.next_station_is_valid(clock - EPSILON) THEN
+        # Car is leaving - release channel and complete call
+        base_stations[current_station] -= 1
+        completed_calls += 1
+        RETURN TERMINATION
+    ENDIF
+    
+    # Release channel from current base station
+    base_stations[current_station] -= 1
+    
+    # Try to acquire channel in next base station
+    next_station = car.get_next_station(clock - EPSILON)
+    IF base_stations[next_station] < TOTAL_CHANNELS THEN
+        # Channel available in next station - handover succeeds
+        base_stations[next_station] += 1
+        
+        # Schedule next event (handover or termination)
+        time_to_next_station = car.get_time_to_next_station(clock)
+        time_of_next_station = clock + time_to_next_station
+        
+        IF time_of_next_station > car.get_end_time() THEN
+            # Call will end before reaching another station
+            Add_Event(car.get_end_time(), CALL_TERMINATION, car)
+        ELSE
+            # Car will reach another station during call
+            Add_Event(time_of_next_station, CALL_HANDOVER, car)
+        ENDIF
+        
+        RETURN HANDOVER_SUCCESS
+    ELSE
+        # No channel available in next station - call is dropped
+        dropped_calls += 1
+        RETURN HANDOVER_DROPPED
+    ENDIF
+```
+
+## 5.4 Call Termination Event Handler
+
+```
+FUNCTION Handle_Call_Termination(car):
+    # Release channel from current base station
+    current_station = car.get_current_station(clock)
+    base_stations[current_station] -= 1
+    
+    # Update completed calls counter
+    completed_calls += 1
+    
+    RETURN TERMINATION
+```
+
+These pseudocode implementations illustrate the core event handling logic of the simulation, showing how calls are initiated, handed over between base stations, and terminated. The implementation includes careful handling of edge cases, such as cars leaving the highway and handovers occurring exactly at cell boundaries.
