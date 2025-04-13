@@ -2,6 +2,12 @@ import pandas as pd
 import plotly.graph_objects as go
 from typing import Dict, List, Tuple, Set
 import plotly.express as px
+import plotly.io as pio
+import os
+from pathlib import Path
+from moviepy.editor import ImageSequenceClip
+import tempfile
+import shutil
 
 import simulator
 import generator
@@ -10,7 +16,8 @@ from tqdm import tqdm
 gen = generator.Generator(seed=6)
 sim = simulator.Simulator(gen, channel_reserved_for_handover=1, logging=True)
 
-TOTAL_STEPS = 1000
+TOTAL_STEPS = 2000
+RENDER_VIDEO = False  # Set to True to render video
 
 print(f"Total steps: {TOTAL_STEPS}")
 
@@ -310,7 +317,64 @@ sliders = [{
 fig.frames = frames
 fig.update_layout(sliders=sliders)
 
+# Display interactive version
 fig.show()
+
+def save_animation_as_video(fig, output_path="animation.mp4", fps=10, width=1280, height=720):
+    """
+    Save a Plotly animation as a video file.
+    
+    Args:
+        fig: Plotly figure with frames
+        output_path: Path to save the video file
+        fps: Frames per second for the video
+        width, height: Dimensions of the video
+    """
+    print(f"Saving animation to {output_path}...")
+    
+    # Create a temporary directory to store the frames
+    temp_dir = tempfile.mkdtemp()
+    try:
+        # Render each frame of the animation
+        frame_paths = []
+        
+        # First, create a copy of the figure with just the layout (no data)
+        base_fig = go.Figure(layout=fig.layout)
+        base_fig.update_layout(width=width, height=height)
+        
+        # Add the static shapes (station lines, etc.)
+        for shape in fig.layout.shapes:
+            base_fig.add_shape(shape)
+            
+        # For each frame, add its data to the base figure and render
+        print("Rendering frames...")
+        for idx, frame in enumerate(tqdm(fig.frames)):
+            # Create a new figure with the same layout for each frame
+            frame_fig = go.Figure(base_fig)
+            
+            # Add the trace from the frame
+            for trace in frame.data:
+                frame_fig.add_trace(trace)
+                
+            # Save the frame as an image
+            frame_path = os.path.join(temp_dir, f"frame_{idx:04d}.png")
+            frame_paths.append(frame_path)
+            pio.write_image(frame_fig, frame_path, width=width, height=height)
+        
+        # Create the video from the frames
+        print("Creating video from frames...")
+        clip = ImageSequenceClip(frame_paths, fps=fps)
+        clip.write_videofile(output_path, codec="libx264", audio=False)
+        print(f"Video saved to {output_path}")
+        
+    finally:
+        # Clean up the temporary directory
+        shutil.rmtree(temp_dir)
+
+# Save the animation as a video
+if RENDER_VIDEO:
+    # Save the animation as a video file
+    save_animation_as_video(fig, output_path="station_usage_animation.mp4", fps=10)
 
 print("General Statistics:")
 print(f"Slots reserved for handover: {sim.channel_reserved_for_handover}")
