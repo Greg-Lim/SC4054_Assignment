@@ -1,23 +1,25 @@
 import pandas as pd
 import plotly.graph_objects as go
 from typing import Dict, List, Tuple, Set
-import plotly.express as px
-import plotly.io as pio
 import os
-from pathlib import Path
-from moviepy.editor import ImageSequenceClip
-import tempfile
-import shutil
 
 import simulator
 import generator
 from tqdm import tqdm
 
-gen = generator.Generator(seed=6)
-sim = simulator.Simulator(gen, channel_reserved_for_handover=1, logging=True)
 
-TOTAL_STEPS = 2000
+TOTAL_STEPS = 1000 # Note: render time is exponential
 RENDER_VIDEO = False  # Set to True to render video
+CHANNEL_RESERVED_FOR_HANDOVER = 1 # 0 for no reserved channels
+
+if RENDER_VIDEO:
+    from moviepy.editor import ImageSequenceClip 
+    import plotly.io as pio
+    import shutil
+    import tempfile
+
+gen = generator.Generator(seed=6)
+sim = simulator.Simulator(gen, channel_reserved_for_handover=CHANNEL_RESERVED_FOR_HANDOVER, logging=True)
 
 print(f"Total steps: {TOTAL_STEPS}")
 
