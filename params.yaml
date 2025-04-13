@@ -6,7 +6,7 @@ call_duration:
 
 inter_arrival_time:
   distribution: exponential
-  lambda: 1.3698168816881688
+  lambda: 0.730024584576294
 
 velocity:
   distribution: normal
