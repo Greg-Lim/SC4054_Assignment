@@ -95,7 +95,7 @@ full_data_df = pd.DataFrame(
 # Parameters
 station_count = 20
 capacity_per_station = 10
-frame_duration = 500  # Set frame duration to 500ms for playback without tweening
+frame_duration = 0  # Set frame duration to 500ms for playback without tweening
 
 # Initialize Plotly figure
 fig = go.Figure(
@@ -284,6 +284,10 @@ for idx, row in tqdm(full_data_df.iterrows(), total=len(full_data_df), desc="Pro
         name=f"{idx}"
     )
     frames.append(frame)
+    if event_results == simulator.EventResult.INITIATION_BLOCKED or event_results == simulator.EventResult.HANDOVER_DROPPED:
+        for i in range(4):
+            frames.append(frame)
+
 
     slider_steps.append({
         "method": "animate",

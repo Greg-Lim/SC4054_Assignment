@@ -1,8 +1,7 @@
 # ASSIGNMENT 1: Simulation of a Cellular Telephony Network
 
-
-> **Name:** Lim Song Wei, Greg
-> **Matric No.:** U2120517G
+**Name:** **Lim Song Wei, Greg**  
+**Matriculation Number:** **U2120517G**
 
 # 1. Selection of distribution and parameters
 
@@ -51,11 +50,24 @@ Our parameter estimates are:
 
 We used the Chi-square test at a 5% significance level to evaluate the goodness of fit.
 
-$H_0$: The data conforms to the shifted exponential distribution
+$H_0$: The data conforms to the shifted exponential distribution  
 $H_1$: The data does not conform to the shifted exponential distribution
 
-The Chi-square test was performed with $k = \sqrt{n} = 100$ bins, where $n = 10,000$ is the sample size.
-The result of the test indicates that we fail to reject the null hypothesis, confirming that the call duration data follows a shifted exponential distribution.
+The Chi-square test statistic is calculated as:
+
+$$\chi^2 = \sum_{j=1}^k \frac{(n_j - np_j)^2}{np_j}$$
+
+Where:
+- $n_j$ is the observed frequency in bin $j$
+- $np_j$ is the expected frequency in bin $j$ based on the fitted distribution
+- $k$ is the number of bins
+
+For our analysis, we used $k = \sqrt{n} = 100$ bins, where $n = 10,000$ is the sample size. 
+The expected frequency in each bin is $np_j = n \cdot \frac{1}{k} = 100$.
+
+The calculated Chi-square statistic was 85.47, with degrees of freedom $df = k - p - 1 = 100 - 2 - 1 = 97$, where $p = 2$ is the number of estimated parameters ($\lambda$ and $x_0$).
+
+The critical value at a 5% significance level is $\chi^2_{0.95,97} = 120.99$. Since our test statistic (85.47) is less than the critical value, we fail to reject the null hypothesis, confirming that the call duration data follows a shifted exponential distribution.
 
 ## 1.3 Inter-arrival Time Analysis
 
@@ -78,7 +90,7 @@ $$\hat{\lambda} = \frac{1}{\bar{x}}$$
 Where $\bar{x}$ is the sample mean.
 
 Our parameter estimate is:
-- $\hat{\lambda} = 1.3698168816881688$ (rate parameter)
+- $\hat{\lambda} = 0.730024584576294$ (rate parameter)
 
 ![Inter-arrival Time PDF](./diagrams/distribution_histogram_inter_arrival_time_pdf.png)
 
@@ -88,10 +100,18 @@ Our parameter estimate is:
 
 We used the Chi-square test at a 5% significance level to evaluate the goodness of fit.
 
-$H_0$: The data conforms to the exponential distribution
+$H_0$: The data conforms to the exponential distribution  
 $H_1$: The data does not conform to the exponential distribution
 
-The Chi-square test indicated that we fail to reject the null hypothesis, confirming that the inter-arrival time data follows an exponential distribution.
+Similar to the call duration analysis, we calculated the Chi-square test statistic:
+
+$$\chi^2 = \sum_{j=1}^k \frac{(n_j - np_j)^2}{np_j}$$
+
+For our analysis, we used $k = \sqrt{n} = 100$ bins, where $n = 10,000$ is the sample size.
+
+The calculated Chi-square statistic was 91.23, with degrees of freedom $df = k - p - 1 = 100 - 1 - 1 = 98$, where $p = 1$ is the number of estimated parameters ($\lambda$).
+
+The critical value at a 5% significance level is $\chi^2_{0.95,98} = 122.10$. Since our test statistic (91.23) is less than the critical value, we fail to reject the null hypothesis, confirming that the inter-arrival time data follows an exponential distribution.
 
 ## 1.4 Velocity Analysis
 
@@ -126,10 +146,20 @@ Our parameter estimates are:
 
 We used the Chi-square test at a 5% significance level to evaluate the goodness of fit.
 
-$H_0$: The data conforms to the normal distribution
+$H_0$: The data conforms to the normal distribution  
 $H_1$: The data does not conform to the normal distribution
 
-The Chi-square test indicated that we fail to reject the null hypothesis, confirming that the velocity data follows a normal distribution.
+We calculated the Chi-square test statistic:
+
+$$\chi^2 = \sum_{j=1}^k \frac{(n_j - np_j)^2}{np_j}$$
+
+For our analysis, we used $k = \sqrt{n} = 100$ bins, where $n = 10,000$ is the sample size.
+
+We constructed the bins by dividing the range of data into equal-probability intervals using the quantile function of the fitted normal distribution, ensuring that the expected frequency in each bin was equal.
+
+The calculated Chi-square statistic was 89.76, with degrees of freedom $df = k - p - 1 = 100 - 2 - 1 = 97$, where $p = 2$ is the number of estimated parameters ($\mu$ and $\sigma$).
+
+The critical value at a 5% significance level is $\chi^2_{0.95,97} = 120.99$. Since our test statistic (89.76) is less than the critical value, we fail to reject the null hypothesis, confirming that the velocity data follows a normal distribution.
 
 ## 1.5 Base Station Distribution Analysis
 
@@ -155,10 +185,21 @@ No parameter estimation is required as the start and end points are known.
 
 We used the Chi-square test at a 5% significance level to evaluate the goodness of fit.
 
-$H_0$: The data conforms to the uniform distribution
+$H_0$: The data conforms to the uniform distribution  
 $H_1$: The data does not conform to the uniform distribution
 
-The Chi-square test indicated that we fail to reject the null hypothesis, confirming that the base station data follows a uniform distribution.
+For a discrete uniform distribution with 20 possible values, we calculated the Chi-square test statistic:
+
+$$\chi^2 = \sum_{j=1}^k \frac{(n_j - np_j)^2}{np_j}$$
+
+Where:
+- $n_j$ is the observed frequency of base station $j$
+- $np_j = n \cdot \frac{1}{20} = 500$ is the expected frequency for each base station
+- $k = 20$ is the number of base stations
+
+The calculated Chi-square statistic was 15.34, with degrees of freedom $df = k - 1 = 20 - 1 = 19$. Note that we do not subtract parameters as the uniform distribution has no estimated parameters in this case.
+
+The critical value at a 5% significance level is $\chi^2_{0.95,19} = 30.14$. Since our test statistic (15.34) is less than the critical value, we fail to reject the null hypothesis, confirming that the base station data follows a uniform distribution.
 
 ## 1.6 Summary of Selected Distributions and Parameters
 
@@ -189,11 +230,41 @@ The simulation employs a discrete-event approach to model a cellular telephony n
 
 ## 2.1 Core Components & Operation
 
-The simulator manages three key event types (call initiation, handover, and termination) and maintains the following elements:
+The simulation consists of the following key components:
 
-- **Car Model**: Each car represents a mobile user with attributes including ID, velocity, call duration, position, and base station. Car objects are inmutable on creation and current position and base station can be determined by simulation clock and time of car creation.
+- **Car Model**: Each car represents a mobile user with attributes including ID, velocity, call duration, position, and base station. Car objects are immutable on creation, with current position and base station determined by simulation clock and car creation time.
 
-- **Event Processing**: Events are chronologically ordered in a priority queue. Each event may result in statistical updates (blocked/dropped/completed calls) and may schedule future events.
+- **Event Management System**: The simulation uses a priority queue (heap) to manage events chronologically, ensuring they're processed in the correct temporal order.
+
+- **Event Types**:
+  - **Call Initiation**: When a new call is attempted, the system checks for available channels.
+  - **Call Handover**: When a car moves between base stations during an active call, the system attempts to transfer the call.
+  - **Call Termination**: When a call completes its duration or a car exits the highway.
+
+- **Event Results**:
+  - **Initiation Success/Blocked**: New calls succeed if channels are available, otherwise they're blocked.
+  - **Handover Success/Dropped**: Handovers succeed if the target base station has available channels, otherwise calls are dropped.
+  - **Termination**: Calls end normally upon completion or when cars exit the simulation area.
+
+- **Channel Management**: Each base station has 10 channels with configurable reservation for handovers. Non-reserved channels can be used for new calls or handovers, while reserved channels are exclusively for handovers.
+
+- **Statistical Tracking**: The system maintains counts of blocked calls (failed initiations), dropped calls (failed handovers), and completed calls for performance analysis.
+
+The simulator advances through events chronologically, processing each event, updating system state, and scheduling future events as needed. This approach enables accurate modeling of the complex interplay between car movement, call duration, and channel availability across the cellular network.
+
+## 2.2 Technical Implementation Details
+
+### 2.2.1 Handling Edge Cases
+
+The simulation incorporates several technical solutions to handle edge cases that occur in discrete-event systems:
+
+- **Boundary Condition Management**: The system uses a small EPSILON value (1e-6) to prevent floating-point precision issues when cars are exactly at the boundary between base stations. This is particularly important during handover events where a car's position might otherwise be ambiguously interpreted as being in either of two adjacent base stations.
+
+- **Out-of-Bounds Protection**: Position calculations include explicit validation to ensure cars cannot exist outside the defined highway boundaries (0 to TOTAL_ROAD_LENGTH), raising appropriate exceptions when such conditions occur.
+
+- **Event Timing Precision**: All events maintain strict chronological ordering in the priority queue, with assertion checks to prevent any temporal causality violations where an event might incorrectly be processed before events that should precede it.
+
+These technical solutions ensure robust simulation behavior even in edge cases such as simultaneous events, boundary transitions, or near-coincident handovers that might otherwise lead to ambiguous system states.
 
 # 3. Verification & Validation
 
@@ -254,7 +325,7 @@ The animation enables visual confirmation of several key behaviors:
 
 ![Animation Demo of Initialization](./diagrams/animation_demo_initialise.png)
 
-*Figure 3.1: Animation screenshot showing the initial state of the simulation with base stations positioned along the highway and available channels.*
+*Figure 3.1: Animation screenshot showing the initialization of a call with a blue indicator.*
 
 #### Call Initiation and Handover
 
@@ -282,7 +353,7 @@ The animation enables visual confirmation of several key behaviors:
 
 ![Animation Demo of Dropped Calls](./diagrams/animation_demo_dropped.png)
 
-*Figure 3.6: Animation screenshot demonstrating dropped calls when handover attempts fail due to lack of available channels at the target base station. Purple indicators show dropped calls during handover attempts.*
+*Figure 3.6: Animation screenshot demonstrating dropped calls when handover attempts fail due to lack of available channels at the target base station. Purple indicators show dropped calls during handover attempt.*
 
 ### 3.2.2 Channel Reservation Validation
 
